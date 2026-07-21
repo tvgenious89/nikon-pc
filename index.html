@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nikon Picture Control Editor</title>
+<link rel="stylesheet" href="assets/css/main.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><span class="nikon-title">Nikon Picture Control</span><span class="nikon-pce">Editor</span></div>
+  <div class="view-toggles">
+    <b>View:</b>
+    <label><input type="checkbox" id="viewHelp" checked> Help</label>
+    <label><input type="checkbox" id="viewCustomPreview" checked> Custom Preview</label>
+    <label><input type="checkbox" id="viewPictureControls" checked> Picture Controls</label>
+    <label><input type="checkbox" id="viewSettings" checked> Settings</label>
+    <label><input type="checkbox" id="viewOriginalImage" checked> Original Image</label>
+    <label><input type="checkbox" id="viewPresetBrowser"> Preset Browser</label>
+  </div>
+  <div class="share">
+    <span class="share-btn" id="btnMakeUrl" title="Build a link that stores the current settings">&#10148; Share custom settings</span>
+    <input id="shareUrl" readonly placeholder="press &quot;Share custom settings&quot; to build a link">
+  </div>
+</div>
+<div class="sub-line">v1.0.0-local &nbsp;&middot;&nbsp; offline re-implementation of <a href="https://www.nikonpc.com/" target="_blank" rel="noopener">nikonpc.com</a></div>
+
+<div class="notice">&#128161;&nbsp; This tool is a third-party utility created for working with Nikon Picture Control files. It is not an official Nikon product and is not affiliated with Nikon Corporation. This copy is a local re-creation of nikonpc.com for personal use &mdash; everything (preview, curve, .NCP export) runs in your browser.</div>
+
+<div id="customPreviewSection">
+  <div class="custom-image-bar">
+    <b>Custom preview</b>&nbsp;(image URL of JPG/PNG, or local JPG/PNG/NEF)
+    <input id="inpImageUrl" placeholder="https://... (host must allow cross-origin use)">
+    <button id="btnUpdateImage">update</button>
+    <button id="btnOpenFile" title="Open a local image (JPG/PNG/WebP or NEF)">open file&hellip;</button>
+    <input type="file" id="fileImage" accept="image/*,.nef,.NEF" hidden>
+    <span class="hint">or drop an image anywhere on the page</span>
+  </div>
+  <div id="gallery"></div>
+</div>
+
+<div id="presetBrowserSection" style="display:none">
+  <div class="header">Preset Browser <span class="sub-header">&mdash; every preset applied to the current image (click to load)</span></div>
+  <div id="presetBrowser"></div>
+</div>
+
+<div class="columns">
+
+  <div id="pcSection" class="panel">
+    <div class="header">Picture Controls</div>
+    <input id="presetSearch" placeholder="search presets&hellip;" title="filter the preset list">
+    <select id="selFileList" size="32" class="npc-list"></select>
+    <div class="pc-actions">
+      <button id="btnLoadNcp" title="Load settings from an existing .NCP / .NP3 file">load file&hellip;</button>
+      <input type="file" id="fileNcp" accept=".ncp,.NCP,.np2,.NP2,.np3,.NP3" hidden>
+      <button id="btnReset" title="Reset to a neutral starting point">reset</button>
+    </div>
+    <div class="pc-actions">
+      <button id="btnDeletePreset" title="Delete the selected user preset" disabled>delete</button>
+      <button id="btnExportLib" title="Download all my presets as JSON">export my presets</button>
+      <button id="btnImportLib" title="Import presets from a JSON file">import&hellip;</button>
+      <input type="file" id="fileLib" accept=".json" hidden>
+    </div>
+  </div>
+
+  <div id="settingsSection" class="panel">
+    <div class="header">Settings <span id="baseNpc" class="sub-header"></span></div>
+    <div class="settings-body">
+      <label class="chk"><input type="checkbox" id="customCurveFlag"> use custom curve</label>
+      <label class="chk"><input type="checkbox" id="showHistogram" checked> histogram</label>
+      <label class="chk" title="also show the histogram after the curve is applied"><input type="checkbox" id="showOutHistogram"> output</label>
+      <span id="curveReadout" class="hint"></span>
+
+      <div id="curveArea">
+        <div class="curve-row">
+          <div class="out-levels">
+            <input id="maxOutput" class="lvl" value="255" title="output white point (0..255)">
+            <input id="minOutput" class="lvl" value="0" title="output black point (0..255)">
+          </div>
+          <canvas id="cCurve" width="322" height="322" tabindex="0"
+                  title="click: select point &middot; drag: move &middot; Ctrl+click: add &middot; Backspace: remove"></canvas>
+        </div>
+        <div class="in-levels">
+          <input id="minInput" class="lvl" value="0" title="input black point (0..255)">
+          <div class="gamma-box">
+            <input type="range" id="gamma" min="0.10" max="3.00" step="0.01" value="1.00" title="halftone / gamma">
+            <span id="gammaVal">1.00</span>
+          </div>
+          <input id="maxInput" class="lvl" value="255" title="input white point (0..255)">
+        </div>
+      </div>
+
+      <div class="points-header">Curve points (input : output)</div>
+      <div id="pointsTable"></div>
+
+      <div id="adjustContainer">
+        <div class="adj-row">
+          <span class="inp-container"><label>Sharpening</label><input id="sharpening" value="3"></span>
+          <label class="auto"><input type="checkbox" id="autoSharpening"> Auto</label>
+        </div>
+        <div class="adj-row">
+          <span class="inp-container"><label>Contrast</label><input id="contrast" value="0"></span>
+          <label class="auto"><input type="checkbox" id="autoContrast"> Auto</label>
+        </div>
+        <div class="adj-row">
+          <span class="inp-container"><label>Brightness</label><input id="brightness" value="0"></span>
+        </div>
+        <div id="colorAdjustContainer">
+          <div class="adj-row">
+            <span class="inp-container"><label>Saturation</label><input id="saturation" value="0"></span>
+            <label class="auto"><input type="checkbox" id="autoSaturation"> Auto</label>
+          </div>
+          <div class="adj-row">
+            <span class="inp-container"><label>Hue</label><input id="hue" value="0"></span>
+          </div>
+        </div>
+        <div id="np3AdjustContainer">
+          <div class="adj-row">
+            <span class="inp-container"><label>Clarity</label><input id="clarity" value="0" title="-5..+5 in 0.25 steps (NP3 only)"></span>
+            <span class="np3-tag">NP3</span>
+          </div>
+          <div class="adj-row">
+            <span class="inp-container"><label>Mid sharp</label><input id="midSharp" value="0" title="mid-range sharpening -3..+3 in 0.25 steps (NP3 only)"></span>
+            <span class="np3-tag">NP3</span>
+          </div>
+        </div>
+        <div id="monochromeAdjustContainer" style="display:none">
+          <div class="adj-row">
+            <span class="inp-container"><label>Filter</label></span>
+            <select id="selFilterEffects" class="sel-adjust">
+              <option value="0">Off</option>
+              <option value="1">Yellow</option>
+              <option value="2">Orange</option>
+              <option value="3">Red</option>
+              <option value="4">Green</option>
+            </select>
+          </div>
+          <div class="adj-row">
+            <span class="inp-container"><label>Toning</label></span>
+            <select id="selToningType" class="sel-adjust">
+              <option value="0">B&amp;W</option>
+              <option value="1">Sepia</option>
+              <option value="2">Cyanotype</option>
+              <option value="3">Red</option>
+              <option value="4">Yellow</option>
+              <option value="5">Green</option>
+              <option value="6">Blue Green</option>
+              <option value="7">Blue</option>
+              <option value="8">Purple Blue</option>
+              <option value="9">Red Purple</option>
+            </select>
+            <span class="inp-container tone-str"><label>strength</label><input id="toning" value="4" title="0..7 (empty = off)"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header dl-header">Download</div>
+      <div id="downloadArea">
+        <div class="adj-row">
+          <span class="inp-container"><label>Base</label></span>
+          <select id="PicCtrlItem" class="sel-adjust">
+            <option>Neutral</option>
+            <option>Standard</option>
+            <option>Vivid</option>
+            <option>Portrait</option>
+            <option>Landscape</option>
+            <option>Monochrome</option>
+            <option>D2XMode1</option>
+            <option>D2XMode2</option>
+            <option>D2XMode3</option>
+          </select>
+        </div>
+        <div class="adj-row">
+          <span class="inp-container"><label>Format</label></span>
+          <select id="fileFormat" class="sel-adjust" title="NCP: DSLRs + Nikon utilities · NP3: Z cameras, D6, D780">
+            <option value="ncp">NCP (DSLR / utilities)</option>
+            <option value="np3-0300">NP3 0300 (Z5/Z6/Z7/Z50)</option>
+            <option value="np3-0310">NP3 0310 (Z8/Z9/Zf/Z6III)</option>
+          </select>
+        </div>
+        <div class="adj-row">
+          <span class="inp-container"><label>Slot Nr.</label><input id="fileName" value="01"></span>
+          <span class="range-hint">01..99</span>
+        </div>
+        <div class="adj-row">
+          <span class="inp-container wide"><label>Stylename</label><input id="RegistrationName" value="CUSTOM 01" maxlength="19"></span>
+        </div>
+        <button id="btnDownload">download</button>
+        <button id="btnSavePreset" title="Save current settings into &quot;My presets&quot;">save as preset</button>
+        <span id="dlName" class="hint"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="previewSection">
+    <div class="header">Preview
+      <span class="sizes" id="previewSizes"></span>
+      <label class="chk split-chk" title="drag the divider on the image to compare"><input type="checkbox" id="splitCompare"> split compare</label>
+    </div>
+    <div id="previewBox">
+      <canvas id="cPreview"></canvas>
+      <div id="previewMsg" class="hint"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="originalPanel">
+  <div class="header" id="originalDragHandle">Original <span class="sub-header">(move me)</span></div>
+  <canvas id="cOriginal"></canvas>
+</div>
+
+<div id="helpSection">
+  <h3>How to use custom curve</h3>
+  <p>
+    <b>Select point</b>: click on a curve point or point number<br>
+    <b>Change point</b>: select a point and move it with mouse or keys &#8592; &#8593; &#8595; &#8594;<br>
+    <b>Add point</b>: CTRL (on Mac command) + mouse click on curve<br>
+    <b>Remove point</b>: select a point and press BACKSPACE
+  </p>
+  <h3>Editor extras</h3>
+  <p>
+    <b>Undo / redo</b>: Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z)<br>
+    <b>Preset Browser</b>: tick it in the View bar to see every preset rendered on the current image<br>
+    <b>Save as preset</b>: stores the current settings in your browser (&ldquo;My presets&rdquo; group in the list)<br>
+    <b>NEF files</b>: drop a NEF to preview using its embedded JPEG
+  </p>
+  <h3>Compatibility</h3>
+  <p>
+    <b>NCP</b> &mdash; Capture NX, View NX, Picture Control Utility, NX Studio; DSLRs: D5000, D7000, D500, D600, D700, D800, D4, D5, D6, Df&hellip;<br>
+    <b>NP3</b> &mdash; Z-mount cameras (Zf, Zfc, Z5, Z6, Z7, Z8, Z9, Z50&hellip;), D6, D780 &mdash; choose 0300 for the first Z generation, 0310 for Z8/Z9-era bodies
+  </p>
+  <p class="hint">
+    Copy the downloaded <code>PICCONxx.NCP</code> / <code>PICCONxx.NP3</code> to the memory card folder <code>NIKON\CUSTOMPC\</code>
+    and use the camera&rsquo;s <i>Manage Picture Control &rarr; Load/Save</i> menu, or import it with Nikon&rsquo;s desktop utilities.
+    NP3 export follows community reverse engineering and is validated structurally &mdash; please test one file on your body
+    before relying on it.
+  </p>
+</div>
+
+<script src="assets/js/core.js"></script>
+<script src="assets/js/presets.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

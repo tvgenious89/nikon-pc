@@ -1,0 +1,151 @@
+/* Nikon Picture Control Editor — local re-implementation.
+   Look & feel modeled on nikonpc.com (title chip #d3ff5a, #ededed headers, #444 label chips). */
+
+* { box-sizing: border-box; }
+body {
+  margin: 0 8px 40px;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  color: #000;
+  background: #fff;
+}
+a { color: #16c; }
+button { font-size: 11px; cursor: pointer; }
+.hint { color: #888; font-size: 10px; }
+
+/* ---------- top bar ---------- */
+.topbar { display: flex; align-items: flex-start; gap: 18px; padding-top: 4px; flex-wrap: wrap; }
+.logo { display: table; background: #000; border: 2px solid #000; white-space: nowrap; }
+.logo .nikon-title { background: #d3ff5a; color: #000; float: left; font-size: 20px; font-weight: bold; padding: 0 10px; }
+.logo .nikon-pce { background: #000; color: #fff; float: left; font-size: 20px; font-weight: bold; padding: 0 10px; }
+.view-toggles { padding-top: 4px; }
+.view-toggles label { margin-right: 6px; cursor: pointer; white-space: nowrap; }
+.share { padding-top: 2px; }
+.share .share-btn { font-weight: bold; cursor: pointer; }
+.share .share-btn:hover { text-decoration: underline; }
+.share input { width: 360px; font-size: 11px; padding: 1px 3px; }
+.sub-line { margin: 2px 0 6px; font-size: 11px; color: #333; }
+
+.notice { background: #ececec; padding: 6px 10px; margin-bottom: 6px; }
+
+/* ---------- custom preview / gallery ---------- */
+#customPreviewSection { background: #f4f6f5; border: 1px solid #ddd; margin-bottom: 8px; }
+.custom-image-bar { padding: 5px 8px; }
+.custom-image-bar input#inpImageUrl { width: 420px; font-size: 11px; padding: 1px 3px; }
+#gallery { padding: 2px 6px 6px; white-space: nowrap; overflow-x: auto; }
+#gallery canvas {
+  height: 44px; margin-right: 3px; cursor: pointer;
+  border: 2px solid transparent; vertical-align: top;
+}
+#gallery canvas.active { border-color: #000; }
+
+/* ---------- columns ---------- */
+.columns { display: flex; align-items: flex-start; gap: 8px; }
+.panel { background: #fafafa; border: 1px solid #e2e2e2; }
+.header {
+  background: #ededed; font-weight: bold; height: 24px; line-height: 24px;
+  padding: 0 8px 0 12px; white-space: nowrap;
+}
+.header .sub-header { font-weight: normal; }
+
+/* picture controls list */
+#pcSection { width: 178px; flex: none; }
+#presetSearch { width: 168px; margin: 4px 5px 0; font-size: 11px; padding: 1px 3px; }
+.npc-list { width: 168px; font-size: 11px; margin: 4px 5px 2px; border: 0; background: #fafafa; }
+.npc-list option { padding: 1px 2px; }
+.npc-list optgroup { font-size: 10px; }
+.pc-actions { padding: 3px 5px 0; display: flex; gap: 4px; flex-wrap: wrap; }
+.pc-actions:last-child { padding-bottom: 6px; }
+
+/* preset browser */
+#presetBrowserSection { border: 1px solid #ddd; background: #f4f6f5; margin-bottom: 8px; }
+#presetBrowser { padding: 6px; display: flex; flex-wrap: wrap; gap: 6px; max-height: 420px; overflow-y: auto; }
+.pb-item { cursor: pointer; text-align: center; }
+.pb-item canvas { display: block; border: 2px solid transparent; }
+.pb-item:hover canvas { border-color: #000; }
+.pb-cap { display: block; font-size: 9px; max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- settings ---------- */
+#settingsSection { width: 262px; flex: none; }
+.settings-body { padding: 5px 6px 8px; }
+.chk { margin-right: 8px; cursor: pointer; white-space: nowrap; }
+
+#curveArea { margin-top: 4px; }
+#curveArea.disabled { opacity: .45; pointer-events: none; }
+.curve-row { display: flex; }
+.out-levels { display: flex; flex-direction: column; justify-content: space-between; margin-right: 2px; }
+.lvl { width: 30px; font-size: 10px; padding: 0 1px; text-align: right; }
+#cCurve { border: 1px solid #444; background: #fff; display: block; width: 224px; height: 224px; outline: none; }
+#cCurve:focus { border-color: #06c; }
+.in-levels { display: flex; align-items: center; margin-top: 2px; margin-left: 32px; width: 224px; }
+.in-levels .gamma-box { flex: 1; display: flex; align-items: center; }
+.in-levels input[type=range] { flex: 1; height: 14px; margin: 0 2px; }
+#gammaVal { width: 30px; font-size: 10px; text-align: center; }
+
+.points-header { margin: 6px 0 2px; font-weight: bold; }
+#pointsTable { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; }
+.pt { display: flex; align-items: center; border: 1px solid #bbb; background: #fff; height: 15px; overflow: hidden; }
+.pt .num {
+  background: #444; color: #fff; font-size: 9px; font-weight: bold;
+  min-width: 14px; text-align: center; height: 100%; line-height: 14px; cursor: pointer;
+}
+.pt.sel .num { background: #d40000; }
+.pt input { width: 50%; border: 0; font-size: 9px; padding: 0; text-align: right; min-width: 0; }
+.pt input:focus { background: #ffefc0; outline: none; }
+
+#adjustContainer { margin-top: 8px; }
+#adjustContainer.curve-locked .curve-replaced input,
+#adjustContainer.curve-locked .curve-replaced { color: #999; }
+.adj-row { display: flex; align-items: center; margin-bottom: 3px; }
+.inp-container {
+  display: inline-flex; align-items: center; border: 1px solid #444; background: #fff;
+  height: 15px; margin-right: 3px; overflow: hidden;
+}
+.inp-container label {
+  background: #444; color: #fff; font-size: 10px; font-weight: bold;
+  line-height: 15px; padding: 0 3px; text-align: right; width: 62px; white-space: nowrap;
+}
+.inp-container input { width: 34px; border: 0; font-size: 10px; text-align: right; padding: 0 2px; }
+.inp-container input:disabled { background: #eee; color: #999; }
+.inp-container.wide input { width: 130px; text-align: left; }
+.inp-container.tone-str { margin-left: 4px; }
+.inp-container.tone-str label { width: 46px; }
+.auto { cursor: pointer; white-space: nowrap; }
+.sel-adjust { font-size: 10px; }
+.range-hint { color: #555; }
+.np3-tag {
+  font-size: 8px; font-weight: bold; color: #fff; background: #8a6d00;
+  padding: 0 3px; border-radius: 2px; height: 12px; line-height: 12px;
+}
+#np3AdjustContainer.np3-off { opacity: .5; }
+#np3AdjustContainer.np3-off .np3-tag { background: #aaa; }
+.split-chk { font-weight: normal; margin-left: 10px; }
+
+.dl-header { margin: 10px -6px 5px; }
+#downloadArea button { margin-top: 2px; }
+
+/* ---------- preview ---------- */
+#previewSection { flex: 1; min-width: 300px; }
+#previewSection .header { background: #ededed; }
+.sizes { font-weight: normal; margin-left: 6px; }
+.sizes span { color: #aaa; cursor: pointer; margin-right: 6px; }
+.sizes span.active { color: #000; font-weight: bold; }
+#previewBox { position: relative; }
+#cPreview { display: block; max-width: 100%; }
+#previewMsg { padding: 4px; }
+
+/* original floating panel */
+#originalPanel {
+  position: absolute; z-index: 20; background: #fff; border: 1px solid #999;
+  box-shadow: 2px 2px 6px rgba(0,0,0,.25);
+}
+#originalPanel .header { cursor: move; }
+#cOriginal { display: block; max-width: 480px; }
+
+/* ---------- help ---------- */
+#helpSection { max-width: 640px; margin-top: 14px; }
+#helpSection h3 { margin: 12px 0 4px; font-size: 14px; }
+#helpSection p { margin: 4px 0; }
+code { background: #f0f0f0; padding: 0 3px; }
+
+.dragover { outline: 3px dashed #d3ff5a; outline-offset: -3px; }
