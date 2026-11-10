@@ -1,2 +1,5 @@
 node_modules/
 .claude/
+tests/local/*
+!tests/local/.gitkeep
+.idea/

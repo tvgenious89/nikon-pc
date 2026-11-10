@@ -133,6 +133,7 @@ button { font-size: 11px; cursor: pointer; }
 #previewBox { position: relative; }
 #cPreview { display: block; max-width: 100%; }
 #previewMsg { padding: 4px; }
+#previewMsg:empty { display: none; }
 
 /* original floating panel */
 #originalPanel {
@@ -141,6 +142,21 @@ button { font-size: 11px; cursor: pointer; }
 }
 #originalPanel .header { cursor: move; }
 #cOriginal { display: block; max-width: 480px; }
+.layout-sel { font-weight: normal; margin-left: 10px; }
+
+/* Original panel docked next to / below the preview */
+#compareBox.side { display: flex; gap: 8px; align-items: flex-start; }
+#compareBox.stack { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+#compareBox.side > * { flex: 0 1 auto; min-width: 0; }
+#compareBox #originalPanel { position: static; box-shadow: none; }
+#compareBox #originalPanel .header { cursor: default; }
+#compareBox #originalPanel .sub-header { display: none; }
+#compareBox #cOriginal { max-width: 100%; }
+#previewBox .docked-only { display: none; }
+#compareBox.side #previewBox .docked-only,
+#compareBox.stack #previewBox .docked-only { display: block; }
+#compareBox.side #previewBox,
+#compareBox.stack #previewBox { border: 1px solid #999; }
 
 /* ---------- help ---------- */
 #helpSection { max-width: 640px; margin-top: 14px; }

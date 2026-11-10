@@ -526,7 +526,7 @@ function decodePictureControl(buf) {
 // ---------------------------------------------------------------- NEF preview
 
 // Extract the largest embedded JPEG preview from a NEF (TIFF container).
-function extractNefJpeg(bytes) {
+function tiffReader(bytes) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   if (b.length < 16) throw new Error('file too small');
   let le;
@@ -537,6 +537,30 @@ function extractNefJpeg(bytes) {
   const u32 = o => le
     ? (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16)) + b[o + 3] * 0x1000000
     : ((b[o] << 24) >>> 0) + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3];
+  return { b, u16, u32 };
+}
+
+// EXIF Orientation (tag 0x0112) from IFD0 of a NEF/TIFF; 1 (upright) if absent.
+// The embedded preview JPEG carries no orientation of its own, so the caller
+// has to apply this to it.
+function nefOrientation(bytes) {
+  const { b, u16, u32 } = tiffReader(bytes);
+  const off = u32(4);
+  if (off <= 0 || off + 2 > b.length) return 1;
+  const n = u16(off);
+  for (let i = 0; i < n && i < 512; i++) {
+    const e = off + 2 + i * 12;
+    if (e + 12 > b.length) break;
+    if (u16(e) === 0x0112) {
+      const v = u16(e + 8);
+      return v >= 1 && v <= 8 ? v : 1;
+    }
+  }
+  return 1;
+}
+
+function extractNefJpeg(bytes) {
+  const { b, u16, u32 } = tiffReader(bytes);
 
   const candidates = [];
   const visited = new Set();
@@ -575,6 +599,6 @@ return {
   clamp, BASE_ENUM, ENUM_BASE, MAX_POINTS, TONE_COLORS, MONO_WEIGHTS, BASE_LOOKS,
   naturalSpline, buildLUT, simplifyLut, colorMatrix, buildChannelLUT,
   processImageData, unsharp, boxBlur,
-  encodeNCP, encodeNP3, decodePictureControl, extractNefJpeg,
+  encodeNCP, encodeNP3, decodePictureControl, extractNefJpeg, nefOrientation,
 };
 });

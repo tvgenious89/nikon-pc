@@ -1,5 +1,5 @@
 /* Offline cache for the Picture Control Editor. Bump VERSION on releases. */
-const VERSION = 'npc-v2';
+const VERSION = 'npc-v6';
 const SHELL = [
   './',
   'index.html',
@@ -14,7 +14,10 @@ const SHELL = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' bypasses the HTTP cache; otherwise a new VERSION can be
+  // filled with stale copies of the shell files and keep serving them.
+  const reqs = SHELL.map(u => new Request(u, { cache: 'reload' }));
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(reqs)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

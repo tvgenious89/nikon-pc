@@ -225,3 +225,37 @@ test('extractNefJpeg finds preview in synthetic NEF', () => {
   assert.equal(got[0], 0xFF);
   assert.equal(got[1], 0xD8);
 });
+
+test('nefOrientation reads IFD0 Orientation tag', () => {
+  for (const le of [true, false]) {
+    const buf = new Uint8Array(64);
+    const dv = new DataView(buf.buffer);
+    buf.set(le ? [0x49, 0x49, 0x2A, 0x00] : [0x4D, 0x4D, 0x00, 0x2A], 0);
+    dv.setUint32(4, 8, le);
+    dv.setUint16(8, 1, le);
+    dv.setUint16(10, 0x0112, le); dv.setUint16(12, 3, le);
+    dv.setUint32(14, 1, le); dv.setUint16(18, 6, le);
+    dv.setUint32(22, 0, le);
+    assert.equal(core.nefOrientation(buf), 6);
+  }
+  const plain = new Uint8Array(64);
+  plain.set([0x49, 0x49, 0x2A, 0x00, 8, 0, 0, 0], 0);
+  assert.equal(core.nefOrientation(plain), 1);
+});
+
+// Real camera files are too large/personal to commit: drop .NEF files into
+// tests/local/ (gitignored) and they are checked here; skipped when empty.
+const LOCAL = path.join(__dirname, 'local');
+const localNefs = fs.existsSync(LOCAL)
+  ? fs.readdirSync(LOCAL).filter(f => /\.nef$/i.test(f)) : [];
+test('local NEF files: preview + orientation', { skip: !localNefs.length && 'no files in tests/local/' }, t => {
+  for (const f of localNefs) {
+    const bytes = new Uint8Array(fs.readFileSync(path.join(LOCAL, f)));
+    const jpeg = core.extractNefJpeg(bytes);
+    assert.equal(jpeg[0], 0xFF); assert.equal(jpeg[1], 0xD8);
+    const o = core.nefOrientation(bytes);
+    assert.ok(o >= 1 && o <= 8, `${f}: orientation ${o}`);
+    t.diagnostic(`${f}: ${(jpeg.length / 1024).toFixed(0)} KB preview, orientation ${o}` +
+                 ({ 6: ' (portrait, rotate 90° CW)', 8: ' (portrait, rotate 270° CW)', 3: ' (upside down)' }[o] || ''));
+  }
+});
