@@ -36,6 +36,7 @@
     <input id="inpImageUrl" placeholder="https://... (host must allow cross-origin use)">
     <button id="btnUpdateImage">update</button>
     <button id="btnOpenFile" title="Open a local image (JPG/PNG/WebP or NEF)">open file&hellip;</button>
+    <button id="btnRotate" title="Rotate the preview image 90&deg; clockwise">rotate &#8635;</button>
     <input type="file" id="fileImage" accept="image/*,.nef,.NEF" hidden>
     <span class="hint">or drop an image anywhere on the page</span>
   </div>
@@ -199,10 +200,24 @@
     <div class="header">Preview
       <span class="sizes" id="previewSizes"></span>
       <label class="chk split-chk" title="drag the divider on the image to compare"><input type="checkbox" id="splitCompare"> split compare</label>
+      <select id="splitDirection" title="split direction">
+        <option value="h">left / right</option>
+        <option value="v">top / bottom</option>
+      </select>
+      <label class="layout-sel">original:
+        <select id="originalLayout" title="where the Original panel is shown">
+          <option value="float">floating</option>
+          <option value="side">side by side</option>
+          <option value="stack">stacked</option>
+        </select>
+      </label>
     </div>
-    <div id="previewBox">
-      <canvas id="cPreview"></canvas>
-      <div id="previewMsg" class="hint"></div>
+    <div id="compareBox">
+      <div id="previewBox">
+        <div class="header docked-only">Processed</div>
+        <canvas id="cPreview"></canvas>
+        <div id="previewMsg" class="hint"></div>
+      </div>
     </div>
   </div>
 

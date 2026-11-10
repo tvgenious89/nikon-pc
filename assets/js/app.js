@@ -34,7 +34,7 @@ const state = {
   curve: defaultCurve(),
   selPoint: -1,
   previewWidth: 480,
-  splitCompare: false, splitPos: 0.5,
+  splitCompare: false, splitPos: 0.5, splitVertical: false,
   image: null, imageLabel: '',
   histogram: null, outHistogram: null,
 };
@@ -558,7 +558,19 @@ function paintPreview() {
   const ctx = cv.getContext('2d');
   ctx.putImageData(lastProcessed, 0, 0);
   placeOriginalPanel();
-  if (state.splitCompare) {
+  if (state.splitCompare && state.splitVertical) {
+    // original on top, processed below
+    const sy = Math.round(clamp(state.splitPos, 0.02, 0.98) * h);
+    ctx.drawImage(srcCanvas, 0, 0, w, sy, 0, 0, w, sy);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, sy - 1, w, 2);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, sy, w, 1);
+    ctx.font = 'bold 11px Arial';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText('original', 6, 14);
+    ctx.fillText('processed', 6, h - 6);
+  } else if (state.splitCompare) {
     const sx = Math.round(clamp(state.splitPos, 0.02, 0.98) * w);
     ctx.drawImage(srcCanvas, 0, 0, sx, h, 0, 0, sx, h);
     ctx.fillStyle = '#fff';
@@ -862,8 +874,37 @@ function loadHash() {
 
 // ---------------------------------------------------------------- image loading
 
-function setImage(src, label) {
-  state.image = src;
+let sourceImage = null; // image as loaded, before rotation
+let imageRotation = 0;  // clockwise degrees: 0, 90, 180 or 270
+
+// EXIF orientation -> clockwise rotation (mirrored variants are not handled)
+const ORIENTATION_ROTATION = { 3: 180, 6: 90, 8: 270 };
+
+function applyRotation() {
+  const src = sourceImage;
+  if (!imageRotation) { state.image = src; return; }
+  const iw = src.width || src.naturalWidth, ih = src.height || src.naturalHeight;
+  const quarter = imageRotation % 180 !== 0;
+  const c = makeCanvas(quarter ? ih : iw, quarter ? iw : ih);
+  const ctx = c.getContext('2d');
+  ctx.translate(c.width / 2, c.height / 2);
+  ctx.rotate(imageRotation * Math.PI / 180);
+  ctx.drawImage(src, -iw / 2, -ih / 2);
+  state.image = c;
+}
+
+function rotateImage() {
+  if (!sourceImage) return;
+  imageRotation = (imageRotation + 90) % 360;
+  applyRotation();
+  requestRender(true);
+  schedulePresetBrowser();
+}
+
+function setImage(src, label, rotation = 0) {
+  sourceImage = src;
+  imageRotation = rotation;
+  applyRotation();
   state.imageLabel = label || '';
   document.querySelectorAll('#gallery canvas').forEach(t => {
     t.classList.toggle('active', t.dataset.label === state.imageLabel);
@@ -880,9 +921,9 @@ function loadImageURL(url) {
   img.src = url;
 }
 
-function loadImageBlob(blob, label) {
+function loadImageBlob(blob, label, rotation) {
   const img = new Image();
-  img.onload = () => { URL.revokeObjectURL(img.src); setImage(img, label); };
+  img.onload = () => { URL.revokeObjectURL(img.src); setImage(img, label, rotation); };
   img.onerror = () => { URL.revokeObjectURL(img.src); $('previewMsg').textContent = 'could not decode image'; };
   img.src = URL.createObjectURL(blob);
 }
@@ -891,8 +932,10 @@ function loadImageFile(file) {
   if (!file) return;
   if (/\.nef$/i.test(file.name)) {
     file.arrayBuffer().then(buf => {
-      const jpeg = C.extractNefJpeg(new Uint8Array(buf));
-      loadImageBlob(new Blob([jpeg], { type: 'image/jpeg' }), file.name);
+      const bytes = new Uint8Array(buf);
+      const jpeg = C.extractNefJpeg(bytes);
+      const rotation = ORIENTATION_ROTATION[C.nefOrientation(bytes)] || 0;
+      loadImageBlob(new Blob([jpeg], { type: 'image/jpeg' }), file.name, rotation);
     }).catch(err => { $('previewMsg').textContent = 'NEF: ' + err.message; });
     return;
   }
@@ -1080,6 +1123,7 @@ function syncUI() {
   $('RegistrationName').value = state.name;
   $('dlName').textContent = '→ ' + currentFileName();
   $('splitCompare').checked = state.splitCompare;
+  $('splitDirection').value = state.splitVertical ? 'v' : 'h';
 
   refreshPointsTable();
 }
@@ -1130,9 +1174,29 @@ function buildPreviewSizes() {
 }
 
 let originalMoved = false;
+const ORIGINAL_LAYOUT_KEY = 'npc-original-layout';
+
+function originalDocked() {
+  return $('originalPanel').parentNode === $('compareBox');
+}
+
+// layout: 'float' (draggable panel), 'side' (right of the preview) or 'stack' (below it)
+function setOriginalLayout(layout) {
+  const panel = $('originalPanel'), box = $('compareBox');
+  box.classList.toggle('side', layout === 'side');
+  box.classList.toggle('stack', layout === 'stack');
+  if (layout === 'float') {
+    if (originalDocked()) document.body.insertBefore(panel, $('helpSection'));
+    placeOriginalPanel();
+  } else {
+    box.appendChild(panel);
+  }
+  $('originalLayout').value = layout;
+  try { localStorage.setItem(ORIGINAL_LAYOUT_KEY, layout); } catch (e) {}
+}
 
 function placeOriginalPanel() {
-  if (originalMoved) return;
+  if (originalMoved || originalDocked()) return;
   const panel = $('originalPanel');
   const pv = $('cPreview').getBoundingClientRect();
   panel.style.left = (window.scrollX + pv.left) + 'px';
@@ -1145,6 +1209,7 @@ function initOriginalPanel() {
   placeOriginalPanel();
   let sx = 0, sy = 0, px = 0, py = 0, dragging = false;
   handle.addEventListener('pointerdown', e => {
+    if (originalDocked()) return;
     dragging = true;
     originalMoved = true;
     sx = e.clientX; sy = e.clientY;
@@ -1158,6 +1223,10 @@ function initOriginalPanel() {
     panel.style.top = Math.max(0, py + e.clientY - sy) + 'px';
   });
   handle.addEventListener('pointerup', () => { dragging = false; });
+  $('originalLayout').addEventListener('change', e => setOriginalLayout(e.target.value));
+  let saved = null;
+  try { saved = localStorage.getItem(ORIGINAL_LAYOUT_KEY); } catch (e) {}
+  if (saved === 'side' || saved === 'stack') setOriginalLayout(saved);
 }
 
 function initViewToggles() {
@@ -1182,7 +1251,9 @@ function initSplitCompare() {
   let dragging = false;
   const setPos = e => {
     const r = cv.getBoundingClientRect();
-    state.splitPos = clamp((e.clientX - r.left) / r.width, 0, 1);
+    state.splitPos = state.splitVertical
+      ? clamp((e.clientY - r.top) / r.height, 0, 1)
+      : clamp((e.clientX - r.left) / r.width, 0, 1);
     paintPreview();
   };
   cv.addEventListener('pointerdown', e => {
@@ -1195,6 +1266,12 @@ function initSplitCompare() {
   cv.addEventListener('pointerup', () => { dragging = false; });
   $('splitCompare').addEventListener('change', e => {
     state.splitCompare = e.target.checked;
+    paintPreview();
+  });
+  $('splitDirection').addEventListener('change', e => {
+    state.splitVertical = e.target.value === 'v';
+    state.splitPos = 0.5;
+    if (!state.splitCompare) { state.splitCompare = true; $('splitCompare').checked = true; }
     paintPreview();
   });
 }
@@ -1353,6 +1430,7 @@ function init() {
     if (e.key === 'Enter') $('btnUpdateImage').click();
   });
   $('btnOpenFile').addEventListener('click', () => $('fileImage').click());
+  $('btnRotate').addEventListener('click', rotateImage);
   $('fileImage').addEventListener('change', e => {
     if (e.target.files[0]) loadImageFile(e.target.files[0]);
     e.target.value = '';
